@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>지역신문 - 청소년 지역 이슈 균형정보 플랫폼</title>
+  <link rel="stylesheet" href="assets/css/style.css" />
+  <style>
+    .page-head {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 36px 20px 8px;
+    }
+    .page-head__title {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--navy-900);
+      margin: 12px 0 8px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:where(:not([data-theme="light"])) .page-head__title { color: #eaf1f8; }
+    }
+    :root[data-theme="dark"] .page-head__title { color: #eaf1f8; }
+    .page-head__desc { font-size: 13.5px; color: var(--text-secondary); margin: 0 0 4px; }
+
+    .section {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 20px 20px 60px;
+    }
+
+    .local-news-note {
+      padding: 14px 16px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+    }
+    .local-news-note--fallback {
+      background: #fff3da;
+      border-color: #f2debb;
+      color: #6b4a00;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:where(:not([data-theme="light"])) .local-news-note--fallback { background: #3a2f16; border-color: #57451e; color: #ffd98c; }
+    }
+    :root[data-theme="dark"] .local-news-note--fallback { background: #3a2f16; border-color: #57451e; color: #ffd98c; }
+
+    .local-news-list { display: flex; flex-direction: column; gap: 10px; }
+    .local-news-item { padding: 16px 18px; }
+    .local-news-item__meta { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+    .local-news-item__meta span + span::before { content: "·"; margin: 0 6px; }
+    .local-news-item__title { font-size: 14.5px; font-weight: 700; color: var(--text-primary); margin: 0 0 8px; }
+    .local-news-item__summary { font-size: 13px; color: var(--text-secondary); margin: 0 0 8px; }
+    .local-news-item__link { font-size: 12.5px; font-weight: 700; color: var(--navy-700); text-decoration: none; }
+    .local-news-item__link:hover { text-decoration: underline; }
+    @media (prefers-color-scheme: dark) {
+      :root:where(:not([data-theme="light"])) .local-news-item__link { color: #9ec5f4; }
+    }
+    :root[data-theme="dark"] .local-news-item__link { color: #9ec5f4; }
+
+    .cta-row {
+      display: flex;
+      justify-content: center;
+      margin-top: 24px;
+    }
+  </style>
+</head>
+<body data-page="local-news">
+  <div id="app-header"></div>
+
+  <main>
+    <div class="page-head">
+      <span class="eyebrow">지역신문</span>
+      <h1 class="page-head__title" id="page-title">지역을 확인하는 중입니다...</h1>
+      <p class="page-head__desc">
+        5·18 · 대구·경북 · 수도권·비수도권 3개 전국 이슈와는 완전히
+        별개인 코너입니다. NPF 서사분석이나 보수·진보 비교 없이, 이
+        지역의 지역신문사가 쓴 기사만 작성 시간순으로 보여줍니다.
+      </p>
+    </div>
+
+    <section class="section">
+      <div id="local-news-note"><!-- JS로 채움 --></div>
+      <div class="local-news-list" id="local-news-list"><!-- JS로 채움 --></div>
+
+      <div class="cta-row">
+        <a class="btn btn-secondary" href="region-status.html">이 지역 현황으로 돌아가기</a>
+      </div>
+    </section>
+  </main>
+
+  <div id="app-footer"></div>
+
+  <script src="assets/js/region-data.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/js/supabase-client.js"></script>
+  <script src="assets/js/common.js"></script>
+  <script src="assets/js/local-news.js"></script>
+</body>
+</html>

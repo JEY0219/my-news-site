@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>관리자 - 청소년 지역 이슈 균형정보 플랫폼</title>
+  <link rel="stylesheet" href="assets/css/style.css" />
+  <style>
+    .page-head { max-width: 1000px; margin: 0 auto; padding: 36px 20px 8px; }
+    .page-head__title { font-size: 22px; font-weight: 800; color: var(--navy-900); margin: 12px 0 8px; }
+    @media (prefers-color-scheme: dark) {
+      :root:where(:not([data-theme="light"])) .page-head__title { color: #eaf1f8; }
+    }
+    :root[data-theme="dark"] .page-head__title { color: #eaf1f8; }
+    .page-head__desc { font-size: 13.5px; color: var(--text-secondary); margin: 0; }
+
+    .section { max-width: 1000px; margin: 0 auto; padding: 20px 20px 60px; }
+
+    .mode-tabs { display: flex; gap: 8px; margin-bottom: 18px; }
+    .mode-tab {
+      flex: 1; font-size: 14px; font-weight: 700; padding: 12px;
+      border-radius: var(--radius-md); border: 1px solid var(--border-strong);
+      background: var(--surface); color: var(--text-secondary); cursor: pointer; text-align: center;
+    }
+    .mode-tab.is-active { background: var(--navy-800); border-color: var(--navy-800); color: #fff; }
+    .mode-panel { display: none; }
+    .mode-panel.is-active { display: block; }
+
+    /* 기사 관리 */
+    .article-form-card { padding: 22px 24px; margin-bottom: 20px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+    .form-grid .field--full { grid-column: 1 / -1; }
+    @media (max-width: 640px) { .form-grid { grid-template-columns: 1fr; } }
+    .field label { display: block; font-size: 12.5px; font-weight: 700; color: var(--text-primary); margin-bottom: 5px; }
+    .field input[type="text"],
+    .field input[type="url"],
+    .field input[type="date"],
+    .field select,
+    .field textarea {
+      width: 100%; padding: 9px 11px; font-size: 13.5px; font-family: inherit;
+      border-radius: var(--radius-sm); border: 1px solid var(--border-strong);
+      background: var(--surface); color: var(--text-primary);
+    }
+    .field textarea { min-height: 60px; resize: vertical; }
+    .field--checkbox { display: flex; align-items: center; gap: 8px; margin-top: 22px; }
+    .form-actions { display: flex; gap: 10px; margin-top: 16px; }
+
+    .article-row {
+      display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .article-row:last-child { border-bottom: none; }
+    .article-row__main { flex: 1; min-width: 0; }
+    .article-row__title { font-size: 13.5px; font-weight: 700; color: var(--text-primary); }
+    .article-row__meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .article-row__actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+    /* 이슈 후보 (승인 대기) */
+    .discovery-actions {
+      display: flex; align-items: center; gap: 12px; padding: 18px 20px; margin-bottom: 16px;
+    }
+    .discovery-status { font-size: 12.5px; color: var(--text-secondary); }
+    .discovery-status--loading { color: var(--navy-700); font-weight: 700; }
+    .discovery-status--error { color: #b91c1c; font-weight: 700; }
+    .discovery-status--success { color: #15803d; font-weight: 700; }
+    @media (prefers-color-scheme: dark) {
+      :root:where(:not([data-theme="light"])) .discovery-status--loading { color: #9ec5f4; }
+      :root:where(:not([data-theme="light"])) .discovery-status--error { color: #fca5a5; }
+      :root:where(:not([data-theme="light"])) .discovery-status--success { color: #86efac; }
+    }
+    :root[data-theme="dark"] .discovery-status--loading { color: #9ec5f4; }
+    :root[data-theme="dark"] .discovery-status--error { color: #fca5a5; }
+    :root[data-theme="dark"] .discovery-status--success { color: #86efac; }
+    .candidate-row {
+      padding: 14px 16px; border-bottom: 1px solid var(--border);
+    }
+    .candidate-row:last-child { border-bottom: none; }
+    .candidate-row__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .candidate-row__title { font-size: 13.5px; font-weight: 700; color: var(--text-primary); }
+    .candidate-row__meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .candidate-row__desc { font-size: 12.5px; color: var(--text-secondary); margin-top: 6px; }
+    .candidate-row__actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .candidate-preview {
+      margin-top: 10px; padding: 10px 12px; background: var(--surface-2); border-radius: var(--radius-sm);
+      display: none;
+    }
+    .candidate-preview.is-open { display: block; }
+    .candidate-preview__item { font-size: 12px; color: var(--text-secondary); padding: 5px 0; border-bottom: 1px dashed var(--border); }
+    .candidate-preview__item:last-child { border-bottom: none; }
+    .candidate-preview__npf { color: var(--text-muted); }
+    .candidate-approve-form { margin-top: 10px; display: none; gap: 8px; flex-direction: column; }
+    .candidate-approve-form.is-open { display: flex; }
+    .candidate-approve-form input {
+      width: 100%; padding: 8px 10px; font-size: 13px; font-family: inherit;
+      border-radius: var(--radius-sm); border: 1px solid var(--border-strong);
+      background: var(--surface); color: var(--text-primary);
+    }
+
+    /* 대시보드 */
+    .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+    @media (max-width: 700px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
+    .stat-card { padding: 16px; }
+    .stat-card__label { font-size: 12px; color: var(--text-muted); font-weight: 700; margin-bottom: 6px; }
+    .stat-card__value { font-size: 20px; font-weight: 800; color: var(--navy-900); }
+    @media (prefers-color-scheme: dark) {
+      :root:where(:not([data-theme="light"])) .stat-card__value { color: #eaf1f8; }
+    }
+    :root[data-theme="dark"] .stat-card__value { color: #eaf1f8; }
+
+    .q-summary-card { padding: 18px 20px; margin-bottom: 12px; }
+    .q-summary-card__label { font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 10px; }
+    .q-bar-row { display: flex; align-items: center; gap: 10px; font-size: 12.5px; margin-bottom: 6px; }
+    .q-bar-row__label { width: 130px; flex-shrink: 0; color: var(--text-secondary); }
+    .q-bar-track { flex: 1; height: 8px; border-radius: 4px; background: var(--border); overflow: hidden; }
+    .q-bar-fill { height: 100%; background: var(--seq-450); }
+    .q-bar-row__count { width: 44px; flex-shrink: 0; text-align: right; color: var(--text-muted); }
+    .q-avg { font-size: 12px; color: var(--navy-700); font-weight: 700; margin-top: 4px; }
+    @media (prefers-color-scheme: dark) {
+      :root:where(:not([data-theme="light"])) .q-avg { color: #9ec5f4; }
+    }
+    :root[data-theme="dark"] .q-avg { color: #9ec5f4; }
+
+    .text-answer-list { display: flex; flex-direction: column; gap: 6px; max-height: 160px; overflow-y: auto; }
+    .text-answer-list__item { font-size: 12.5px; color: var(--text-secondary); padding: 6px 8px; background: var(--surface-2); border-radius: var(--radius-sm); }
+
+    .dashboard-actions { display: flex; justify-content: flex-end; margin-bottom: 16px; }
+  </style>
+</head>
+<body data-page="admin">
+  <div id="app-header"></div>
+
+  <main>
+    <div id="admin-guard" class="page-head">
+      <span class="eyebrow">관리자</span>
+      <h1 class="page-head__title">권한을 확인하는 중입니다...</h1>
+    </div>
+
+    <div id="admin-content" style="display:none;">
+      <div class="page-head">
+        <span class="eyebrow">관리자</span>
+        <h1 class="page-head__title">관리자 화면</h1>
+        <p class="page-head__desc">기사 데이터를 관리하고 사전·사후 설문 결과를 확인합니다.</p>
+      </div>
+
+      <section class="section">
+        <div class="mode-tabs">
+          <button type="button" class="mode-tab" data-mode="articles">기사 관리</button>
+          <button type="button" class="mode-tab" data-mode="candidates">이슈 후보</button>
+          <button type="button" class="mode-tab" data-mode="dashboard">설문 결과</button>
+        </div>
+
+        <!-- 기사 관리 -->
+        <div class="mode-panel" id="panel-articles">
+          <div class="card article-form-card">
+            <p class="q-summary-card__label" id="article-form-title">새 기사 추가</p>
+            <div class="form-banner form-banner--error" id="article-form-error"></div>
+            <div class="form-grid">
+              <div class="field">
+                <label for="f-no">기사 번호</label>
+                <input type="text" id="f-no" placeholder="예: NEWS010" />
+              </div>
+              <div class="field">
+                <label for="f-issue">이슈</label>
+                <select id="f-issue">
+                  <option value="">불러오는 중...</option>
+                </select>
+              </div>
+              <div class="field field--full">
+                <label for="f-title">제목</label>
+                <input type="text" id="f-title" />
+              </div>
+              <div class="field">
+                <label for="f-outlet">언론사</label>
+                <input type="text" id="f-outlet" />
+              </div>
+              <div class="field">
+                <label for="f-region">보도 지역</label>
+                <input type="text" id="f-region" />
+              </div>
+              <div class="field">
+                <label for="f-date">작성 날짜</label>
+                <input type="date" id="f-date" />
+              </div>
+              <div class="field field--checkbox">
+                <input type="checkbox" id="f-estimated" />
+                <label for="f-estimated" style="margin:0;">추정 날짜입니다</label>
+              </div>
+              <div class="field field--full">
+                <label for="f-summary">요약</label>
+                <textarea id="f-summary"></textarea>
+              </div>
+              <div class="field field--full">
+                <label for="f-url">원문 URL</label>
+                <input type="url" id="f-url" />
+              </div>
+              <div class="field">
+                <label for="f-victim">피해자</label>
+                <input type="text" id="f-victim" />
+              </div>
+              <div class="field">
+                <label for="f-responsible">책임 주체</label>
+                <input type="text" id="f-responsible" />
+              </div>
+              <div class="field">
+                <label for="f-solver">해결자</label>
+                <input type="text" id="f-solver" />
+              </div>
+              <div class="field">
+                <label for="f-emotion">감정 분류</label>
+                <input type="text" id="f-emotion" />
+              </div>
+              <div class="field field--full">
+                <label for="f-policy">정책 대안</label>
+                <input type="text" id="f-policy" />
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="button" id="btn-save-article" class="btn btn-primary">저장</button>
+              <button type="button" id="btn-cancel-edit" class="btn btn-ghost" style="display:none;">수정 취소</button>
+            </div>
+          </div>
+
+          <div class="card card-pad">
+            <div id="article-list-admin"><!-- JS로 채움 --></div>
+          </div>
+        </div>
+
+        <!-- 이슈 후보 (승인 대기) -->
+        <div class="mode-panel" id="panel-candidates">
+          <div class="card discovery-actions">
+            <button type="button" id="btn-run-discovery" class="btn btn-primary">새 후보 찾기</button>
+            <span class="discovery-status" id="discovery-status">
+              17개 시/도를 순회하며 네이버 뉴스를 검색합니다. 1~3분 정도 걸릴 수 있습니다.
+            </span>
+          </div>
+          <div class="card card-pad">
+            <div id="candidate-list-admin"><!-- JS로 채움 --></div>
+          </div>
+        </div>
+
+        <!-- 설문 결과 대시보드 -->
+        <div class="mode-panel" id="panel-dashboard">
+          <div class="dashboard-actions">
+            <button type="button" id="btn-download-all-csv" class="btn btn-secondary">전체 응답 CSV 내려받기</button>
+          </div>
+          <div class="stat-grid">
+            <div class="card stat-card">
+              <div class="stat-card__label">사전 설문 응답</div>
+              <div class="stat-card__value" id="stat-pre-count">-</div>
+            </div>
+            <div class="card stat-card">
+              <div class="stat-card__label">사후 설문 응답</div>
+              <div class="stat-card__value" id="stat-post-count">-</div>
+            </div>
+            <div class="card stat-card">
+              <div class="stat-card__label">감정 자가점검 응답</div>
+              <div class="stat-card__value" id="stat-emotion-count">-</div>
+            </div>
+            <div class="card stat-card">
+              <div class="stat-card__label">등록된 기사</div>
+              <div class="stat-card__value" id="stat-article-count">-</div>
+            </div>
+          </div>
+
+          <h2 class="section__title" style="font-size:15px; font-weight:800; margin:0 0 10px;">사전 설문</h2>
+          <div id="dashboard-pre"><!-- JS로 채움 --></div>
+
+          <h2 class="section__title" style="font-size:15px; font-weight:800; margin:20px 0 10px;">사후 설문</h2>
+          <div id="dashboard-post"><!-- JS로 채움 --></div>
+
+          <h2 class="section__title" style="font-size:15px; font-weight:800; margin:20px 0 10px;">감정 자가점검</h2>
+          <div id="dashboard-emotion"><!-- JS로 채움 --></div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div id="app-footer"></div>
+
+  <script src="assets/js/region-data.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/js/supabase-client.js"></script>
+  <script src="assets/js/common.js"></script>
+  <script src="assets/js/survey-data.js"></script>
+  <script src="assets/js/articles-api.js"></script>
+  <script src="assets/js/issues-api.js"></script>
+  <script src="assets/js/admin.js"></script>
+</body>
+</html>

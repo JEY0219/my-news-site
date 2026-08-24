@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>설문 참여 - 청소년 지역 이슈 균형정보 플랫폼</title>
+  <link rel="stylesheet" href="assets/css/style.css" />
+  <style>
+    .page-head {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 36px 20px 8px;
+    }
+    .page-head__title {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--navy-900);
+      margin: 12px 0 8px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:where(:not([data-theme="light"])) .page-head__title { color: #eaf1f8; }
+    }
+    :root[data-theme="dark"] .page-head__title { color: #eaf1f8; }
+    .page-head__desc { font-size: 13.5px; color: var(--text-secondary); margin: 0; }
+
+    .section {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 20px 20px 60px;
+    }
+
+    .mode-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .mode-tab {
+      flex: 1;
+      font-size: 14px;
+      font-weight: 700;
+      padding: 12px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-strong);
+      background: var(--surface);
+      color: var(--text-secondary);
+      cursor: pointer;
+      text-align: center;
+    }
+    .mode-tab.is-active {
+      background: var(--navy-800);
+      border-color: var(--navy-800);
+      color: #fff;
+    }
+
+    .mode-panel { display: none; }
+    .mode-panel.is-active { display: block; }
+
+    .intro-box {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 18px;
+    }
+
+    .form-card { padding: 24px; }
+    .submit-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 6px;
+    }
+
+    /* 저장된 응답 */
+    .summary-card { padding: 22px 24px; margin-top: 24px; }
+    .summary-card__title { font-size: 15px; font-weight: 800; margin: 0 0 4px; }
+    .summary-card__desc { font-size: 12.5px; color: var(--text-muted); margin: 0 0 16px; }
+    .summary-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .summary-counts {
+      display: flex;
+      gap: 20px;
+    }
+    .summary-count__value {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--navy-900);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:where(:not([data-theme="light"])) .summary-count__value { color: #eaf1f8; }
+    }
+    :root[data-theme="dark"] .summary-count__value { color: #eaf1f8; }
+    .summary-count__label { font-size: 12px; color: var(--text-muted); }
+    .summary-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  </style>
+</head>
+<body data-page="survey">
+  <div id="app-header"></div>
+
+  <main>
+    <div class="page-head">
+      <span class="eyebrow">설문 참여</span>
+      <h1 class="page-head__title">사전 · 사후 설문</h1>
+      <p class="page-head__desc">
+        이름과 정치 성향, 정당 지지 여부는 수집하지 않습니다. 사전 설문과
+        사후 설문은 본인이 기억할 수 있는 익명 참여 번호(숫자 네 자리)로
+        연결됩니다.
+      </p>
+    </div>
+
+    <section class="section">
+      <div id="login-required" class="form-banner form-banner--error">
+        설문 응답을 저장하려면 먼저 <a href="#" id="login-required-link">로그인하거나 식별번호를 입력</a>해 주세요.
+      </div>
+
+      <div class="mode-tabs">
+        <button type="button" class="mode-tab" data-mode="pre">사전 설문</button>
+        <button type="button" class="mode-tab" data-mode="post">사후 설문</button>
+      </div>
+
+      <!-- 사전 설문 -->
+      <div class="mode-panel" id="panel-pre">
+        <div class="intro-box">
+          안녕하세요. 이 설문은 청소년이 지역 이슈와 관련된 뉴스를 어떤
+          방식으로 이해하는지 확인하기 위한 조사입니다. 응답은 연구
+          목적으로만 사용하며 이름과 정치 성향 및 정당 지지 여부는 수집하지
+          않습니다. 각 문항을 읽고 현재 생각과 가장 가까운 답을 선택해
+          주세요.
+        </div>
+        <div class="card form-card">
+          <div class="form-banner form-banner--error" id="pre-error">
+            참여 번호는 숫자 네 자리로 입력해 주세요.
+          </div>
+          <div class="form-banner form-banner--success" id="pre-success">
+            저장되었습니다.
+          </div>
+          <div id="pre-form"><!-- JS로 채움 --></div>
+          <div class="submit-row">
+            <button type="button" id="btn-submit-pre" class="btn btn-primary">사전 설문 제출하기</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 사후 설문 -->
+      <div class="mode-panel" id="panel-post">
+        <div class="intro-box">
+          웹페이지 이용이 완료되었습니다. 다음 문항은 웹페이지 이용
+          전후의 인식 변화를 확인하기 위한 질문입니다. 사전 설문에서
+          사용한 익명 참여 번호와 같은 번호를 입력해 주세요.
+        </div>
+        <div class="card form-card">
+          <div class="form-banner form-banner--error" id="post-error">
+            참여 번호는 숫자 네 자리로 입력해 주세요.
+          </div>
+          <div class="form-banner form-banner--success" id="post-success">
+            저장되었습니다.
+          </div>
+          <div id="post-form"><!-- JS로 채움 --></div>
+          <div class="submit-row">
+            <button type="button" id="btn-submit-post" class="btn btn-primary">사후 설문 제출하기</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card summary-card">
+        <p class="summary-card__title">저장된 응답</p>
+        <p class="summary-card__desc" id="summary-scope-note">
+          로그인 상태(회원 계정 또는 식별번호)를 기준으로 내가 제출한
+          응답 수를 보여줍니다.
+        </p>
+        <div class="summary-row">
+          <div class="summary-counts">
+            <div>
+              <div class="summary-count__value" id="count-pre">-</div>
+              <div class="summary-count__label">사전 설문</div>
+            </div>
+            <div>
+              <div class="summary-count__value" id="count-post">-</div>
+              <div class="summary-count__label">사후 설문</div>
+            </div>
+          </div>
+          <div class="summary-actions">
+            <a href="results.html" class="btn btn-primary">결과 안내 화면으로 이동</a>
+            <button type="button" id="btn-download" class="btn btn-secondary">내 응답 JSON으로 내려받기</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="app-footer"></div>
+
+  <script src="assets/js/region-data.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/js/supabase-client.js"></script>
+  <script src="assets/js/common.js"></script>
+  <script src="assets/js/survey-form.js"></script>
+  <script src="assets/js/survey-data.js"></script>
+  <script src="assets/js/survey.js"></script>
+</body>
+</html>

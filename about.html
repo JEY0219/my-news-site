@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>연구 소개 - 청소년 지역 이슈 균형정보 플랫폼</title>
+  <link rel="stylesheet" href="assets/css/style.css" />
+  <style>
+    .page-head {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 36px 20px 8px;
+    }
+    .page-head__title {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--navy-900);
+      margin: 12px 0 8px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:where(:not([data-theme="light"])) .page-head__title { color: #eaf1f8; }
+    }
+    :root[data-theme="dark"] .page-head__title { color: #eaf1f8; }
+    .page-head__desc { font-size: 13.5px; color: var(--text-secondary); margin: 0; }
+
+    .section {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 24px 20px 0;
+    }
+    .section:last-of-type { padding-bottom: 60px; }
+    .section__title {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--text-primary);
+      margin: 0 0 14px;
+    }
+
+    .npf-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 760px) {
+      .npf-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 520px) {
+      .npf-grid { grid-template-columns: 1fr; }
+    }
+    .npf-card { padding: 18px; }
+    .npf-card__name {
+      font-size: 14.5px;
+      font-weight: 800;
+      color: var(--text-primary);
+      margin: 0 0 8px;
+    }
+    .npf-card__desc {
+      font-size: 12.5px;
+      color: var(--text-secondary);
+      margin: 0 0 10px;
+    }
+    .npf-card__words {
+      font-size: 11.5px;
+      color: var(--navy-700);
+      background: var(--navy-100);
+      display: inline;
+      padding: 2px 0;
+      line-height: 1.8;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:where(:not([data-theme="light"])) .npf-card__words { color: #cfe0f2; }
+    }
+    :root[data-theme="dark"] .npf-card__words { color: #cfe0f2; }
+
+    .disclaimer-box {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .privacy-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 22px 24px;
+    }
+    .privacy-list__item {
+      display: flex;
+      gap: 10px;
+      font-size: 13.5px;
+      color: var(--text-primary);
+      line-height: 1.6;
+    }
+    .privacy-list__icon { flex-shrink: 0; }
+  </style>
+</head>
+<body data-page="about">
+  <div id="app-header"></div>
+
+  <main>
+    <div class="page-head">
+      <span class="eyebrow">연구 소개</span>
+      <h1 class="page-head__title">이 플랫폼은 무엇을 분석하나요</h1>
+      <p class="page-head__desc">
+        이 웹페이지는 정책서사 분석 기준(NPF)과 개인정보 보호 원칙에 따라
+        제작된 연구용 프로토타입입니다. 이 플랫폼은 사용자의 정치 성향을
+        분석하거나 저장하지 않습니다.
+      </p>
+    </div>
+
+    <section class="section">
+      <h2 class="section__title">정책서사 분석 기준 (NPF)</h2>
+      <div class="npf-grid">
+        <div class="card npf-card">
+          <p class="npf-card__name">피해자</p>
+          <p class="npf-card__desc">기사에서 손해를 입거나 보호받아야 할 대상으로 제시된 사람 또는 집단입니다.</p>
+          <span class="npf-card__words">희생자 · 유가족 · 시민 · 청년 · 지방 · 지역 주민 · 지역 대학 · 유권자</span>
+        </div>
+        <div class="card npf-card">
+          <p class="npf-card__name">책임 주체</p>
+          <p class="npf-card__desc">문제의 원인이나 책임이 있다고 제시된 주체를 표시합니다.</p>
+          <span class="npf-card__words">국가폭력 · 군부 · 왜곡 · 중앙정부 · 수도권 집중 · 정권 · 정치권 · 산업 구조</span>
+        </div>
+        <div class="card npf-card">
+          <p class="npf-card__name">해결자</p>
+          <p class="npf-card__desc">문제를 해결할 수 있다고 제시된 주체를 표시합니다.</p>
+          <span class="npf-card__words">정부 · 지자체 · 국회 · 사법부 · 시민사회 · 지역 대학</span>
+        </div>
+        <div class="card npf-card">
+          <p class="npf-card__name">감정 어휘</p>
+          <p class="npf-card__desc">기사 제목과 요약문에서 강조되는 감정 표현을 분류합니다.</p>
+          <span class="npf-card__words">분노 · 불안 · 소외 · 자부심 · 연대</span>
+        </div>
+        <div class="card npf-card">
+          <p class="npf-card__name">정책 대안</p>
+          <p class="npf-card__desc">기사에서 제시한 해결방안을 범주로 구분합니다.</p>
+          <span class="npf-card__words">처벌 · 교육 · 진상규명 · 균형발전 · 인프라 · 분산 · 일자리 · 공공기관 이전</span>
+        </div>
+      </div>
+      <div class="disclaimer-box">
+        이 분석은 기사의 사실 여부나 언론사의 정치 성향을 판정하는 기능이
+        아닙니다. 기사에서 반복적으로 강조된 서사 구조를 비교하기 위한
+        자료입니다. 자동 분류 결과는 최종 판단이 아니라 연구자가 작성한
+        수동 코딩 결과를 보조하는 기능으로 사용합니다.
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 class="section__title">개인정보 보호 원칙</h2>
+      <div class="card privacy-list">
+        <div class="privacy-list__item">
+          <span class="privacy-list__icon">📍</span>
+          <span>정확한 위도와 경도는 행정구역 변환이 끝난 직후 즉시 삭제합니다. 서버에는 시도와 시군구 정보만 전달합니다.</span>
+        </div>
+        <div class="privacy-list__item">
+          <span class="privacy-list__icon">🙅</span>
+          <span>위치 정보 사용에 동의하지 않아도 언제든지 지역을 직접 선택할 수 있습니다.</span>
+        </div>
+        <div class="privacy-list__item">
+          <span class="privacy-list__icon">🗳️</span>
+          <span>정치 성향과 정당 지지 여부, 개인별 기사 클릭 기록은 수집하지 않습니다.</span>
+        </div>
+        <div class="privacy-list__item">
+          <span class="privacy-list__icon">🔢</span>
+          <span>설문 응답은 이름을 받지 않고 본인이 기억할 수 있는 임의의 익명 참여 번호(예: 좋아하는 숫자 네 자리)로 저장합니다.</span>
+        </div>
+        <div class="privacy-list__item">
+          <span class="privacy-list__icon">📰</span>
+          <span>기사는 조회 수나 이용자 성향에 따른 추천 없이 작성 시간순으로만 제공합니다.</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="app-footer"></div>
+
+  <script src="assets/js/region-data.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/js/supabase-client.js"></script>
+  <script src="assets/js/common.js"></script>
+</body>
+</html>

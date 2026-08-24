@@ -1,0 +1,11 @@
+node_modules/
+.env
+.env.local
+.env.*.local
+.DS_Store
+data/news-cache.json
+npm-debug.log*
+
+# Claude Code 로컬 도구 권한 설정 (이 저장소 밖의 개인 작업 환경 설정,
+# 앱 동작과 무관 - .vscode/.idea처럼 커밋 대상 아님)
+.claude/

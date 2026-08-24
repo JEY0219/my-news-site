@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>최신기사 - 청소년 지역 이슈 균형정보 플랫폼</title>
+  <link rel="stylesheet" href="assets/css/style.css" />
+  <style>
+    .page-head {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 36px 20px 8px;
+    }
+    .page-head__title {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--navy-900);
+      margin: 12px 0 8px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:where(:not([data-theme="light"])) .page-head__title { color: #eaf1f8; }
+    }
+    :root[data-theme="dark"] .page-head__title { color: #eaf1f8; }
+    .page-head__desc { font-size: 13.5px; color: var(--text-secondary); margin: 0 0 10px; }
+
+    .section {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px 20px 60px;
+    }
+
+    .order-note {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin: 0 0 16px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .order-note__meta { color: var(--text-muted); font-size: 12px; }
+
+    .news-groups {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* 비교(페어) 카드 */
+    .pair-block { padding: 16px; }
+    .pair-block__label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--accent-teal);
+      margin-bottom: 10px;
+    }
+    .pair-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 640px) {
+      .pair-grid { grid-template-columns: 1fr; }
+    }
+    .pair-col {
+      padding: 14px 16px;
+      background: var(--surface-2);
+      border-radius: var(--radius-md);
+    }
+    .pair-col__outlet {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--navy-700);
+      background: var(--navy-100);
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 999px;
+      margin-bottom: 8px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:where(:not([data-theme="light"])) .pair-col__outlet { color: #cfe0f2; }
+    }
+    :root[data-theme="dark"] .pair-col__outlet { color: #cfe0f2; }
+    .pair-col__orientation {
+      font-size: 11.5px;
+      font-weight: 700;
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 999px;
+      margin: 0 0 8px 6px;
+    }
+    .pair-col__orientation--conservative { color: #9a3412; background: #ffedd5; }
+    .pair-col__orientation--progressive { color: #1e40af; background: #dbeafe; }
+    @media (prefers-color-scheme: dark) {
+      :root:where(:not([data-theme="light"])) .pair-col__orientation--conservative { color: #fdba74; background: #431407; }
+      :root:where(:not([data-theme="light"])) .pair-col__orientation--progressive { color: #93c5fd; background: #172554; }
+    }
+    :root[data-theme="dark"] .pair-col__orientation--conservative { color: #fdba74; background: #431407; }
+    :root[data-theme="dark"] .pair-col__orientation--progressive { color: #93c5fd; background: #172554; }
+    .pair-col__title { font-size: 14px; font-weight: 700; color: var(--text-primary); margin: 0 0 6px; }
+    .pair-col__date { font-size: 11.5px; color: var(--text-muted); margin: 0 0 8px; }
+    .pair-col__summary { font-size: 13px; color: var(--text-secondary); margin: 0 0 8px; }
+    .pair-col__link { font-size: 12px; font-weight: 700; color: var(--navy-700); text-decoration: none; }
+    .pair-col__link:hover { text-decoration: underline; }
+    @media (prefers-color-scheme: dark) {
+      :root:where(:not([data-theme="light"])) .pair-col__link { color: #9ec5f4; }
+    }
+    :root[data-theme="dark"] .pair-col__link { color: #9ec5f4; }
+
+    /* 서사분석 카드 토글 - article-compare.html의 NPF 칩과 같은
+       디자인을 그대로 써서 "같은 기능"이라는 걸 알아볼 수 있게 한다. */
+    .npf-toggle {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 5px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border-strong);
+      background: var(--surface);
+      color: var(--text-secondary);
+      cursor: pointer;
+      margin: 4px 0 0;
+    }
+    .npf-toggle.is-open { background: var(--navy-800); border-color: var(--navy-800); color: #fff; }
+    .npf-panel { display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+    .npf-panel.is-open { display: block; }
+    .npf-panel__disclaimer {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin: 0 0 8px;
+    }
+    .npf-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .npf-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11.5px;
+      padding: 3px 9px 3px 3px;
+      border-radius: 999px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+    }
+    .npf-tag__label {
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 999px;
+      color: #fff;
+      background: var(--navy-700);
+      font-size: 10.5px;
+    }
+    .npf-tag--victim .npf-tag__label { background: #b5533a; }
+    .npf-tag--responsible .npf-tag__label { background: #8a5b00; }
+    .npf-tag--solver .npf-tag__label { background: #2f7a4f; }
+    .npf-tag--emotion .npf-tag__label { background: #6a4fb0; }
+    .npf-tag--policy .npf-tag__label { background: var(--navy-700); }
+
+    .news-status-note {
+      font-size: 13px;
+      color: var(--text-secondary);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+    }
+  </style>
+</head>
+<body data-page="latest">
+  <div id="app-header"></div>
+
+  <main>
+    <div class="page-head">
+      <span class="eyebrow">최신기사</span>
+      <h1 class="page-head__title">최신기사</h1>
+      <p class="page-head__desc">
+        지역 이슈와 직접 관련되지 않은 일반 기사입니다. 네이버 뉴스 검색
+        결과를 바탕으로, 같은 사건을 보수 성향 언론사와 진보 성향 언론사가
+        함께 다룬 경우만 골라 나란히 비교해서 보여줍니다. 짝을 찾지 못한
+        기사는 표시하지 않습니다. 하루 5쌍(10건)씩 새로 쌓이며, 지난
+        기사는 지우지 않고 계속 모아둡니다. 각 기사 아래 "서사분석 보기"를
+        누르면 5·18 등 전국 이슈에 쓴 것과 같은 방식(단어 사전 기반
+        자동분류)으로 뽑은 피해자·책임주체·해결자·감정·해결책을 볼 수
+        있습니다.
+      </p>
+    </div>
+
+    <section class="section">
+      <div class="order-note">
+        <span>
+          아래 기사는 조회 수나 이용자 성향에 따라 추천되지 않습니다. 최신
+          기사부터 순서대로 배열했습니다. 목록은 24시간마다 하루 5건씩
+          자동으로 새로 쌓입니다(과거 기사는 삭제되지 않습니다).
+        </span>
+        <span class="order-note__meta" id="fetched-at"></span>
+      </div>
+      <p class="muted" id="total-count" style="font-size:12.5px; margin:0 0 12px;"></p>
+      <div class="news-groups" id="news-groups"><!-- JS로 채움 --></div>
+      <div style="display:flex; justify-content:center; margin-top:18px;">
+        <button type="button" id="btn-load-more" class="btn btn-secondary" style="display:none;">
+          더보기
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <div id="app-footer"></div>
+
+  <script src="assets/js/region-data.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/js/supabase-client.js"></script>
+  <script src="assets/js/common.js"></script>
+  <script src="assets/js/latest-news.js"></script>
+</body>
+</html>

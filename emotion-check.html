@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>감정 자가 점검 - 청소년 지역 이슈 균형정보 플랫폼</title>
+  <link rel="stylesheet" href="assets/css/style.css" />
+  <style>
+    .page-head {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 36px 20px 8px;
+    }
+    .page-head__title {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--navy-900);
+      margin: 12px 0 8px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:where(:not([data-theme="light"])) .page-head__title { color: #eaf1f8; }
+    }
+    :root[data-theme="dark"] .page-head__title { color: #eaf1f8; }
+    .page-head__desc {
+      font-size: 13.5px;
+      color: var(--text-secondary);
+      margin: 0;
+    }
+
+    .section {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 20px 20px 60px;
+    }
+
+    .form-card { padding: 24px; margin-bottom: 20px; }
+
+    .submit-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 6px;
+    }
+
+    #result-panel { display: none; }
+    #result-panel.is-visible { display: block; }
+    .result-card {
+      padding: 26px 24px;
+      text-align: center;
+    }
+    .result-card__badge { font-size: 30px; margin-bottom: 10px; }
+    .result-card__text {
+      font-size: 14.5px;
+      color: var(--text-secondary);
+      line-height: 1.7;
+      max-width: 520px;
+      margin: 0 auto 20px;
+    }
+    .result-card__actions {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+  </style>
+</head>
+<body data-page="emotion-check">
+  <div id="app-header"></div>
+
+  <main>
+    <div class="page-head">
+      <span class="eyebrow">감정 자가 점검</span>
+      <h1 class="page-head__title">기사를 읽으며 어떤 감정을 느꼈나요?</h1>
+      <p class="page-head__desc">
+        기사를 읽으며 느낀 감정은 정책 판단에 영향을 줄 수 있습니다. 아래
+        질문을 통해 자신의 반응을 확인해 보세요. 응답 내용은 개인의 정치
+        성향을 판정하는 데 사용하지 않습니다.
+      </p>
+    </div>
+
+    <section class="section">
+      <section id="form-section">
+        <div class="card form-card">
+          <div id="login-required" class="form-banner form-banner--error">
+            응답을 저장하려면 먼저 <a href="#" id="login-required-link">로그인하거나 식별번호를 입력</a>해 주세요.
+          </div>
+          <div id="form-error" class="form-banner form-banner--error">
+            모든 문항에 응답한 뒤 제출할 수 있습니다.
+          </div>
+          <div id="emotion-form"><!-- JS로 채움 --></div>
+          <div class="submit-row">
+            <button type="button" id="btn-submit" class="btn btn-primary">응답 제출하기</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="result-panel">
+        <div class="card result-card">
+          <div class="result-card__badge">🙂</div>
+          <p class="result-card__text">
+            처음 느낀 감정 자체가 잘못된 것은 아닙니다. 다만 여러 기사를
+            비교하면서 감정이 어떤 표현과 서사에서 비롯되었는지 확인하는
+            과정이 중요합니다.
+          </p>
+          <div class="result-card__actions">
+            <a id="btn-to-survey" class="btn btn-primary" href="survey.html?mode=post">사후 설문 참여하기</a>
+            <a id="btn-back" class="btn btn-secondary" href="region-compare.html">지역 비교로 돌아가기</a>
+            <a class="btn btn-ghost" href="index.html">홈으로</a>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div id="app-footer"></div>
+
+  <script src="assets/js/region-data.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/js/supabase-client.js"></script>
+  <script src="assets/js/common.js"></script>
+  <script src="assets/js/survey-form.js"></script>
+  <script src="assets/js/emotion-check.js"></script>
+</body>
+</html>

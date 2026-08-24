@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>지역 설정 - 청소년 지역 이슈 균형정보 플랫폼</title>
+  <link rel="stylesheet" href="assets/css/style.css" />
+  <style>
+    .flow {
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 48px 20px 80px;
+    }
+    .flow__title {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--navy-900);
+      margin: 14px 0 6px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:where(:not([data-theme="light"])) .flow__title { color: #eaf1f8; }
+    }
+    :root[data-theme="dark"] .flow__title { color: #eaf1f8; }
+    .flow__desc {
+      color: var(--text-secondary);
+      font-size: 14.5px;
+      margin: 0 0 24px;
+    }
+    .panel { display: none; }
+    .panel.is-active { display: block; }
+
+    .privacy-box {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 16px 18px;
+      font-size: 13.5px;
+      color: var(--text-secondary);
+      margin-bottom: 20px;
+    }
+
+    .field { margin-bottom: 16px; }
+    .field label {
+      display: block;
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+    }
+    .field select {
+      width: 100%;
+      padding: 12px 14px;
+      font-size: 15px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-strong);
+      background: var(--surface);
+      color: var(--text-primary);
+    }
+    .field select:disabled { opacity: 0.55; }
+
+    .action-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .status-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13.5px;
+      color: var(--text-secondary);
+      margin: 14px 0;
+      min-height: 20px;
+    }
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid var(--border-strong);
+      border-top-color: var(--navy-700);
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .confirm-card {
+      text-align: center;
+      padding: 32px 24px;
+    }
+    .confirm-card__label {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .confirm-card__region {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--navy-900);
+      margin-bottom: 4px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:where(:not([data-theme="light"])) .confirm-card__region { color: #eaf1f8; }
+    }
+    :root[data-theme="dark"] .confirm-card__region { color: #eaf1f8; }
+  </style>
+</head>
+<body data-page="my-region">
+  <div id="app-header"></div>
+
+  <main>
+    <div class="flow">
+
+      <!-- 1) GPS 동의 패널 -->
+      <section id="panel-gps" class="panel">
+        <span class="eyebrow">위치 정보 안내</span>
+        <h1 class="flow__title">내 지역을 자동으로 확인할까요?</h1>
+        <p class="flow__desc">
+          현재 위치를 시군구 단위로 확인하여 지역 이슈를 제공합니다. 정확한
+          위도와 경도는 저장하지 않으며 위치 확인이 완료된 뒤 즉시 삭제합니다.
+          위치 제공을 원하지 않는 경우 지역을 직접 선택할 수 있습니다.
+        </p>
+
+        <div class="card card-pad">
+          <div class="action-list">
+            <button id="btn-gps-agree" class="btn btn-primary btn-block">
+              위치 정보 사용에 동의합니다
+            </button>
+            <button id="btn-go-manual" class="btn btn-secondary btn-block">
+              지역을 직접 선택합니다
+            </button>
+            <a class="btn btn-ghost btn-block" href="index.html">홈으로 돌아갑니다</a>
+          </div>
+          <div id="gps-status" class="status-line"></div>
+        </div>
+      </section>
+
+      <!-- 2) 직접 선택 패널 -->
+      <section id="panel-manual" class="panel">
+        <span class="eyebrow">지역 직접 선택</span>
+        <h1 class="flow__title">지역을 선택해 주세요</h1>
+        <p class="flow__desc">시도와 시군구를 순서대로 선택하면 지역 현황을 확인할 수 있습니다.</p>
+        <div id="manual-notice" class="status-line" style="display:none;"></div>
+
+        <div class="card card-pad">
+          <div class="field">
+            <label for="select-sido">시도 선택</label>
+            <select id="select-sido">
+              <option value="">시도를 선택하세요</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="select-sigungu">시군구 선택</label>
+            <select id="select-sigungu" disabled>
+              <option value="">시도를 먼저 선택하세요</option>
+            </select>
+          </div>
+          <div class="action-list">
+            <button id="btn-manual-confirm" class="btn btn-primary btn-block" disabled>
+              선택 완료
+            </button>
+            <button id="btn-go-gps" class="btn btn-ghost btn-block">
+              위치 정보로 자동 설정하기
+            </button>
+            <a class="btn btn-ghost btn-block" href="index.html">홈으로 돌아갑니다</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3) 확인 패널 -->
+      <section id="panel-confirm" class="panel">
+        <span class="eyebrow">지역 선택 완료</span>
+        <h1 class="flow__title">선택한 지역을 확인해 주세요</h1>
+
+        <div class="card confirm-card">
+          <div class="confirm-card__label">현재 선택 지역</div>
+          <div id="confirm-region" class="confirm-card__region">-</div>
+          <div id="confirm-tag" class="muted" style="font-size:13px;"></div>
+        </div>
+
+        <div class="action-list" style="margin-top:20px;">
+          <a id="btn-to-status" class="btn btn-primary btn-block" href="region-status.html">
+            지역 이슈 확인하기
+          </a>
+          <button id="btn-reselect" class="btn btn-ghost btn-block">
+            지역이 다른가요? 다시 선택하기
+          </button>
+        </div>
+
+        <div class="privacy-box" style="margin-top:24px;">
+          서버에는 시도와 시군구 정보만 전달되며, 위치 사용에 동의하지 않아도
+          언제든지 지역을 직접 선택할 수 있습니다. 정치 성향과 정당 지지 여부
+          및 개인별 기사 클릭 기록은 수집하지 않습니다.
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <div id="app-footer"></div>
+
+  <script src="assets/js/region-data.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/js/supabase-client.js"></script>
+  <script src="assets/js/common.js"></script>
+  <script src="assets/js/geocode.js"></script>
+  <script src="assets/js/region-select.js"></script>
+</body>
+</html>

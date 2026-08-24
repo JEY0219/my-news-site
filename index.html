@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>청소년 지역 이슈 균형정보 플랫폼</title>
+  <link rel="stylesheet" href="assets/css/style.css" />
+  <style>
+    .hero {
+      padding: 64px 20px 40px;
+      max-width: 780px;
+      margin: 0 auto;
+      text-align: center;
+    }
+    .hero__headline {
+      font-size: clamp(24px, 4vw, 34px);
+      font-weight: 800;
+      color: var(--navy-900);
+      line-height: 1.4;
+      margin: 20px 0 12px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:where(:not([data-theme="light"])) .hero__headline { color: #eaf1f8; }
+    }
+    :root[data-theme="dark"] .hero__headline { color: #eaf1f8; }
+    .hero__sub {
+      font-size: 16px;
+      color: var(--text-secondary);
+      margin: 0 0 32px;
+    }
+    .hero__actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+      margin-bottom: 8px;
+    }
+    .hero__actions .btn { min-width: 220px; }
+
+    .steps {
+      max-width: 780px;
+      margin: 40px auto 0;
+      padding: 0 20px;
+    }
+    .steps h2 {
+      font-size: 15px;
+      color: var(--text-secondary);
+      font-weight: 700;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    .steps__list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    .steps__list li {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 16px 14px;
+      font-size: 13.5px;
+      color: var(--text-primary);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .steps__num {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--navy-100);
+      color: var(--navy-800);
+      font-size: 12px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:where(:not([data-theme="light"])) .steps__num { color: #cfe0f2; }
+    }
+    :root[data-theme="dark"] .steps__num { color: #cfe0f2; }
+  </style>
+</head>
+<body data-page="home">
+  <div id="app-header"></div>
+
+  <main>
+    <section class="hero">
+      <span class="eyebrow">청소년 지역 이슈 균형정보 플랫폼</span>
+      <h1 class="hero__headline">
+        내가 사는 지역의 문제는<br />다른 지역에서도 같은 방식으로 보도될까요?
+      </h1>
+      <p class="hero__sub">
+        지역 이슈를 여러 언론사의 기사와 정책서사로 비교해 보세요.
+      </p>
+
+      <div class="hero__actions">
+        <a class="btn btn-primary" href="region-select.html?mode=gps">내 지역 이슈 보기</a>
+        <a class="btn btn-secondary" href="region-select.html?mode=manual">지역을 직접 선택하기</a>
+      </div>
+    </section>
+
+    <section class="steps">
+      <h2>이용 절차</h2>
+      <ol class="steps__list">
+        <li><span class="steps__num">1</span>지역을 선택합니다</li>
+        <li><span class="steps__num">2</span>지역의 주요 이슈를 확인합니다</li>
+        <li><span class="steps__num">3</span>여러 언론사의 기사를 비교합니다</li>
+        <li><span class="steps__num">4</span>기사 속 피해자와 책임 주체 및 해결책을 확인합니다</li>
+        <li><span class="steps__num">5</span>다른 지역 관점과 비교합니다</li>
+        <li><span class="steps__num">6</span>설문에 참여합니다</li>
+      </ol>
+    </section>
+  </main>
+
+  <div id="app-footer"></div>
+
+  <script src="assets/js/region-data.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/js/supabase-client.js"></script>
+  <script src="assets/js/common.js"></script>
+</body>
+</html>
