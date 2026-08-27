@@ -1044,13 +1044,6 @@ function linkMatchesDomain(link, domain) {
 const LOCAL_NEWS_CACHE_TTL_MS = 15 * 60 * 1000; // 15분
 const localNewsCache = new Map(); // 캐시 키(시/도) -> { items, fetchedAt }
 
-/* 서울자치신문(onseoul.net)은 다른 지역신문에 비해 실제 발행량이
-   적어, 검색 시점에 따라 최근 기사가 거의 없을 수 있다. 기사가 너무
-   적은 채로 노출하면 "지역신문 코너"로서 신뢰하기 어려우므로, 최소
-   건수를 못 채우면 다른 지역과 동일하게 "확인된 기사가 없습니다"로
-   안내하고 다른 시/도 기사로 대신 채우지 않는다. */
-const MIN_ARTICLES_FOR_SEOUL_NEWSPAPER = 5;
-
 /* 시/도별로 등록된 지역신문 이름을 그대로 네이버 뉴스 검색어로 써서
    기사를 모은 뒤, 실제로 그 신문사 도메인에서 나온 기사만 남긴다(검색어
    매칭만으로는 그 신문사를 인용/언급한 다른 매체 기사도 섞이기 때문에
@@ -1091,13 +1084,6 @@ async function fetchLocalNews(sido) {
     fetched.sort((a, b) => b.date.localeCompare(a.date));
     items = fetched.slice(0, 30);
     localNewsCache.set(sido, { items, fetchedAt: Date.now() });
-  }
-
-  /* 서울자치신문은 검색 시점에 최근 기사가 거의 없을 수 있다(위 주석
-     참고). 최소 건수를 못 채우면 items를 비워 다른 지역과 동일한
-     "확인된 기사가 없습니다" 안내로 이어지게 한다. */
-  if (sido === "서울특별시" && items.length < MIN_ARTICLES_FOR_SEOUL_NEWSPAPER) {
-    items = [];
   }
 
   /* "주요 지역 이슈" 카드용 - 지역신문 기사 제목에서 자주 등장하는
