@@ -268,9 +268,7 @@
     }
 
     localIssueValueEl.textContent = keywords.join(" · ");
-    localIssueNoteEl.textContent = result.fallbackOf
-      ? "수도권(경기·인천) 지역신문 기사 기준"
-      : "지역신문 기사 제목 빈도 기준";
+    localIssueNoteEl.textContent = "지역신문 기사 제목 빈도 기준";
   }
 
   fetch(`/api/local-news?sido=${encodeURIComponent(region.sido)}`)

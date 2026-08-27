@@ -47,13 +47,6 @@
       return;
     }
 
-    /* 서울처럼 자체 지역신문이 없는 지역은 서버가 수도권(경기·인천)
-       기사로 대신 채워주면서 fallbackOf를 함께 내려준다 - 왜 다른
-       지역 기사가 나오는지 알 수 있게 안내 문구를 붙인다. */
-    if (result.fallbackOf) {
-      noteEl.innerHTML += `<div class="card local-news-note local-news-note--fallback">${result.fallbackOf} 지역신문이 준비 중이라 수도권(경기·인천) 뉴스를 보여드립니다.</div>`;
-    }
-
     if (result.status === "not_configured") {
       const msg =
         (result.outlets || []).length === 0

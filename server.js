@@ -961,13 +961,9 @@ async function requireAdmin(req) {
    광역시/도 단위로 발행되어(시/군/구 전담지는 흔치 않음) region-data.js
    REGIONS의 키(시/도)와 동일한 키를 쓴다. 시/도마다 대표 지역신문
    1~2곳을 골라 실제 홈페이지 도메인을 웹 검색으로 확인해 넣었다(2026-08
-   기준). 서울특별시는 "서울신문"처럼 전국적으로 읽히는 종합지는 있지만
-   다른 시/도의 oo일보처럼 그 지역 밀착 보도를 전문으로 하는 지역신문이
-   뚜렷하지 않아, 억지로 끼워 맞추는 대신 빈 배열로 두고
-   "지역신문 준비 중"으로 안내한다. 신문사가 개편되거나 도메인이
-   바뀌면 이 표만 고치면 된다. */
+   기준). 신문사가 개편되거나 도메인이 바뀌면 이 표만 고치면 된다. */
 const LOCAL_NEWSPAPER_DOMAINS = {
-  "서울특별시": [],
+  "서울특별시": [{ name: "서울자치신문", domain: "onseoul.net" }],
   "부산광역시": [
     { name: "부산일보", domain: "busan.com" },
     { name: "국제신문", domain: "kookje.co.kr" },
@@ -1042,49 +1038,35 @@ function linkMatchesDomain(link, domain) {
   }
 }
 
-/* 서울특별시는 LOCAL_NEWSPAPER_DOMAINS에 등록된 자체 지역신문이 없다
-   (위 주석 참고). 그렇다고 방문자에게 아무 기사도 안 보여주는 대신,
-   서울이 선택됐을 때만 수도권(경기·인천) 지역신문으로 대신 채운다.
-   fetchLocalNews가 이 대체가 일어났는지를 fallbackOf로 알려주면,
-   화면에서 "서울 지역신문이 준비 중이라 수도권 뉴스를 보여드립니다"
-   같은 안내를 붙일 수 있다. */
-const SEOUL_FALLBACK_SIDOS = ["경기도", "인천광역시"];
-
 /* 시/도 하나를 다시 조회하는 빈도가 잦을 수 있어(지역 현황 화면을
    새로고침할 때마다) 짧게 메모리 캐시한다 - "최신기사"처럼 영구
    아카이브가 필요한 기능은 아니라서 서버 재시작 시 사라져도 무방하다. */
 const LOCAL_NEWS_CACHE_TTL_MS = 15 * 60 * 1000; // 15분
-const localNewsCache = new Map(); // 캐시 키(시/도 또는 "fallback:서울특별시") -> { items, fetchedAt }
+const localNewsCache = new Map(); // 캐시 키(시/도) -> { items, fetchedAt }
+
+/* 서울자치신문(onseoul.net)은 다른 지역신문에 비해 실제 발행량이
+   적어, 검색 시점에 따라 최근 기사가 거의 없을 수 있다. 기사가 너무
+   적은 채로 노출하면 "지역신문 코너"로서 신뢰하기 어려우므로, 최소
+   건수를 못 채우면 다른 지역과 동일하게 "확인된 기사가 없습니다"로
+   안내하고 다른 시/도 기사로 대신 채우지 않는다. */
+const MIN_ARTICLES_FOR_SEOUL_NEWSPAPER = 5;
 
 /* 시/도별로 등록된 지역신문 이름을 그대로 네이버 뉴스 검색어로 써서
    기사를 모은 뒤, 실제로 그 신문사 도메인에서 나온 기사만 남긴다(검색어
    매칭만으로는 그 신문사를 인용/언급한 다른 매체 기사도 섞이기 때문에
    도메인 확인이 필수). 여러 신문사 결과를 합쳐 최신순으로 정렬한다. */
 async function fetchLocalNews(sido) {
-  let papers = LOCAL_NEWSPAPER_DOMAINS[sido] || [];
-  let fallbackOf = null;
-
-  if (sido === "서울특별시" && papers.length === 0) {
-    fallbackOf = sido;
-    const seenDomains = new Set();
-    papers = SEOUL_FALLBACK_SIDOS.flatMap((s) => LOCAL_NEWSPAPER_DOMAINS[s] || []).filter((p) => {
-      if (seenDomains.has(p.domain)) return false; // 경인일보처럼 경기·인천에 중복 등록된 신문사 제외
-      seenDomains.add(p.domain);
-      return true;
-    });
-  }
-
+  const papers = LOCAL_NEWSPAPER_DOMAINS[sido] || [];
   const outlets = papers.map((p) => p.name);
 
   if (papers.length === 0) {
-    return { status: "not_configured", outlets, items: [], fallbackOf, topKeywords: [] };
+    return { status: "not_configured", outlets, items: [], topKeywords: [] };
   }
   if (!NAVER_CLIENT_ID || !NAVER_CLIENT_SECRET) {
-    return { status: "not_configured", outlets, items: [], fallbackOf, topKeywords: [] };
+    return { status: "not_configured", outlets, items: [], topKeywords: [] };
   }
 
-  const cacheKey = fallbackOf ? `fallback:${fallbackOf}` : sido;
-  const cached = localNewsCache.get(cacheKey);
+  const cached = localNewsCache.get(sido);
   let items;
 
   if (cached && Date.now() - cached.fetchedAt < LOCAL_NEWS_CACHE_TTL_MS) {
@@ -1108,7 +1090,14 @@ async function fetchLocalNews(sido) {
     }
     fetched.sort((a, b) => b.date.localeCompare(a.date));
     items = fetched.slice(0, 30);
-    localNewsCache.set(cacheKey, { items, fetchedAt: Date.now() });
+    localNewsCache.set(sido, { items, fetchedAt: Date.now() });
+  }
+
+  /* 서울자치신문은 검색 시점에 최근 기사가 거의 없을 수 있다(위 주석
+     참고). 최소 건수를 못 채우면 items를 비워 다른 지역과 동일한
+     "확인된 기사가 없습니다" 안내로 이어지게 한다. */
+  if (sido === "서울특별시" && items.length < MIN_ARTICLES_FOR_SEOUL_NEWSPAPER) {
+    items = [];
   }
 
   /* "주요 지역 이슈" 카드용 - 지역신문 기사 제목에서 자주 등장하는
@@ -1127,7 +1116,7 @@ async function fetchLocalNews(sido) {
     topKeywords = candidates.filter((kw) => !outlets.some((name) => name.includes(kw) || kw.includes(name))).slice(0, 3);
   }
 
-  return { status: "ok", outlets, items, fallbackOf, topKeywords };
+  return { status: "ok", outlets, items, topKeywords };
 }
 
 /* ---------------- 라우트 ---------------- */
