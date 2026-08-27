@@ -156,6 +156,42 @@ img { max-width: 100%; }
 }
 .site-nav::-webkit-scrollbar { display: none; }
 
+/* 햄버거 토글 버튼 - 데스크톱에서는 숨김 */
+.site-header__toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.site-header__toggle-icon,
+.site-header__toggle-icon::before,
+.site-header__toggle-icon::after {
+  content: "";
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+}
+.site-header__toggle-icon {
+  position: relative;
+}
+.site-header__toggle-icon::before,
+.site-header__toggle-icon::after {
+  position: absolute;
+  left: 0;
+}
+.site-header__toggle-icon::before { top: -6px; }
+.site-header__toggle-icon::after { top: 6px; }
+
 .site-nav a {
   white-space: nowrap;
   padding: 8px 12px;
@@ -200,14 +236,41 @@ img { max-width: 100%; }
 }
 :root[data-theme="dark"] .site-header__region { color: #cfe0f2; }
 
-/* 모바일: 메뉴를 아래 줄로 */
+/* 모바일: 가로 스크롤 대신 햄버거 메뉴로 전체 항목을 펼친다 */
 @media (max-width: 780px) {
   .site-header__bar {
     flex-wrap: wrap;
     height: auto;
     padding: 10px 16px;
   }
-  .site-nav { order: 3; width: 100%; }
+  .site-header__toggle {
+    display: flex;
+    order: 2;
+    margin-left: auto;
+  }
+  .site-header__region { order: 3; }
+
+  .site-nav {
+    order: 4;
+    flex: 1 1 100%; /* flex:1(flex-basis:0%)을 덮어써서 강제로 다음 줄로 내려가게 함 */
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    overflow-x: visible;
+    max-height: 0;
+    overflow-y: hidden;
+    transition: max-height 0.2s ease;
+  }
+  .site-nav.is-open {
+    max-height: 480px;
+    margin-top: 10px;
+  }
+  .site-nav a {
+    padding: 12px 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .site-nav a:last-child { border-bottom: none; }
 }
 
 /* ---------------- 공통 푸터 ---------------- */

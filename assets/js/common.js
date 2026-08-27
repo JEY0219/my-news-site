@@ -158,11 +158,39 @@ function renderHeader() {
           <span class="site-header__brand-mark" aria-hidden="true"></span>
           <span>지역 이슈 균형정보</span>
         </a>
-        <nav class="site-nav" aria-label="주요 메뉴">${buildLinks()}</nav>
+        <button
+          type="button"
+          class="site-header__toggle"
+          aria-expanded="false"
+          aria-controls="site-nav"
+          aria-label="메뉴 열기"
+        >
+          <span class="site-header__toggle-icon" aria-hidden="true"></span>
+        </button>
+        <nav class="site-nav" id="site-nav" aria-label="주요 메뉴">${buildLinks()}</nav>
         ${regionBadge}
       </div>
     </header>
   `;
+
+  const toggle = mount.querySelector(".site-header__toggle");
+  const nav = mount.querySelector(".site-nav");
+  if (toggle && nav) {
+    toggle.addEventListener("click", () => {
+      const isOpen = nav.classList.toggle("is-open");
+      toggle.setAttribute("aria-expanded", String(isOpen));
+      toggle.setAttribute("aria-label", isOpen ? "메뉴 닫기" : "메뉴 열기");
+    });
+    // 메뉴 항목을 클릭해서 다른 페이지로 이동할 때는 열려 있던 상태가
+    // 다음 페이지에 남지 않도록 접어 둔다 (뒤로가기로 돌아왔을 때 등).
+    nav.addEventListener("click", (e) => {
+      if (e.target.closest("a")) {
+        nav.classList.remove("is-open");
+        toggle.setAttribute("aria-expanded", "false");
+        toggle.setAttribute("aria-label", "메뉴 열기");
+      }
+    });
+  }
 
   getIdentity().then((identity) => {
     let label = "로그인";
@@ -170,8 +198,8 @@ function renderHeader() {
     else if (identity.kind === "member") label = `👤 ${identity.email}`;
     else if (identity.kind === "guest") label = `🔢 게스트 ${identity.code}`;
 
-    const nav = mount.querySelector(".site-nav");
-    if (nav) nav.innerHTML = buildLinks(label, identity.kind === "admin");
+    const navEl = mount.querySelector(".site-nav");
+    if (navEl) navEl.innerHTML = buildLinks(label, identity.kind === "admin");
   });
 }
 
