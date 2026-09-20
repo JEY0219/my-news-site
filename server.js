@@ -992,7 +992,6 @@ const LOCAL_NEWSPAPER_DOMAINS = {
   "세종특별자치시": [{ name: "세종의소리", domain: "sjsori.com" }],
   "경기도": [
     { name: "경기일보", domain: "kyeonggi.com" },
-    { name: "경인일보", domain: "kyeongin.com" },
   ],
   "강원특별자치도": [
     { name: "강원일보", domain: "kwnews.co.kr" },
