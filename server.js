@@ -42,6 +42,7 @@ require("dotenv").config();
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
 const cron = require("node-cron");
 const { createClient } = require("@supabase/supabase-js");
 
@@ -780,6 +781,55 @@ const NEWS_CRON_SCHEDULE = process.env.NEWS_CRON_SCHEDULE || "0 6 * * *";
 const NEWS_CRON_TIMEZONE = process.env.NEWS_CRON_TIMEZONE || "Asia/Seoul";
 const NEWS_CRON_ENABLED = process.env.NEWS_CRON_ENABLED !== "0";
 
+/* 즉시 갱신(스케줄을 기다리지 않고 지금 네이버를 긁는 것)에 필요한 토큰.
+
+   Render 무료 플랜은 트래픽이 없으면 서버가 잠들고, 그러면 node-cron
+   타이머도 함께 사라져 06:00 실행이 통째로 불발된다. 그래서 외부 cron
+   서비스(cron-job.org 등)가 매일 한 번 /api/latest-news/refresh 를 호출해
+   서버를 깨우면서 갱신까지 시키는 운용을 상정한다.
+
+   그 엔드포인트가 공개돼 있으면 아무나 눌러 네이버 API 일일 호출 쿼터를
+   소진시킬 수 있다(실제로 연속 호출 시 HTTP 429가 돌아온다). 그래서
+   토큰을 요구한다. 토큰이 설정되지 않았으면 즉시 갱신 자체를 끈다 -
+   기본값이 "누구나 호출 가능"이 되지 않도록 하기 위해서다. 일반 조회는
+   토큰 없이 그대로 동작한다. */
+const NEWS_REFRESH_TOKEN = process.env.NEWS_REFRESH_TOKEN || "";
+
+/* 토큰 비교는 길이와 내용이 같을 때만 true를 돌려주되, 앞에서 몇 글자가
+   맞았는지가 응답 시간에 드러나지 않게 한다. */
+function safeTokenEqual(given, expected) {
+  const a = Buffer.from(String(given || ""), "utf-8");
+  const b = Buffer.from(String(expected || ""), "utf-8");
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
+/* Authorization: Bearer <토큰>을 우선 보고, 헤더를 못 넣는 단순한 cron
+   서비스를 위해 ?token= 도 받는다. 쿼리스트링은 서버 접근 로그에 그대로
+   남으므로 헤더 쪽을 권한다. */
+function newsRefreshTokenOf(req) {
+  const auth = req.get("authorization") || "";
+  const bearer = auth.match(/^Bearer\s+(.+)$/i);
+  if (bearer) return bearer[1].trim();
+  return typeof req.query.token === "string" ? req.query.token : "";
+}
+
+/* 통과하면 true. 막으면 응답까지 여기서 끝내고 false를 돌려준다. */
+function checkNewsRefreshAuth(req, res) {
+  if (!NEWS_REFRESH_TOKEN) {
+    res.status(403).json({
+      status: "not_configured",
+      error: "NEWS_REFRESH_TOKEN이 설정되지 않아 즉시 갱신이 꺼져 있습니다.",
+    });
+    return false;
+  }
+  if (!safeTokenEqual(newsRefreshTokenOf(req), NEWS_REFRESH_TOKEN)) {
+    res.status(403).json({ status: "error", error: "갱신 토큰이 올바르지 않습니다." });
+    return false;
+  }
+  return true;
+}
+
 /* 스케줄러와 방문자 요청이 동시에 네이버를 긁고 같은 파일에 쓰는 것을
    막는 잠금. 이미 갱신이 돌고 있으면 그 결과를 그대로 나눠 쓴다. */
 let newsRefreshInFlight = null;
@@ -1337,9 +1387,37 @@ app.get("/api/local-news", async (req, res) => {
   }
 });
 
+/* 외부 cron이 서버를 깨우면서 갱신까지 시키는 용도. 깨우기만 하면 되는
+   경우라도 이 경로를 쓰면 되고, 결과로 몇 건이 쌓였는지 돌려준다.
+   cron 서비스에 따라 GET만 되는 곳이 있어 둘 다 받는다. */
+async function handleNewsRefresh(req, res) {
+  if (!checkNewsRefreshAuth(req, res)) return;
+
+  try {
+    const result = await refreshNewsArchive(true);
+    res.json({
+      status: result.status,
+      added: result.addedCount,
+      total: result.archive.length,
+      lastFetchedAt: result.lastFetchedAt,
+      error: result.error,
+    });
+  } catch (err) {
+    console.error("최신기사 즉시 갱신 실패:", err);
+    res.status(502).json({ status: "error", error: err.message });
+  }
+}
+
+app.get("/api/latest-news/refresh", handleNewsRefresh);
+app.post("/api/latest-news/refresh", handleNewsRefresh);
+
 app.get("/api/latest-news", async (req, res) => {
   try {
+    /* 최신기사 페이지(latest-news.js)는 refresh를 보내지 않는다. 즉
+       여기에 403을 돌려줘도 일반 열람에는 영향이 없다. */
     const forceRefresh = req.query.refresh === "1";
+    if (forceRefresh && !checkNewsRefreshAuth(req, res)) return;
+
     const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
 
