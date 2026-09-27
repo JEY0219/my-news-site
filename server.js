@@ -860,6 +860,49 @@ async function runScheduledNewsRefresh(label, forceRefresh) {
   }
 }
 
+/* 17개 시/도를 차례로 훑는다. 신문사가 33곳이라 호출이 그만큼 나가므로
+   fetchLocalNewsFromNaver()가 사이사이 간격을 둔다. 한 지역이 실패해도
+   나머지는 계속 간다. */
+async function runScheduledLocalNewsRefresh(label, forceRefresh) {
+  if (!NAVER_CLIENT_ID || !NAVER_CLIENT_SECRET) {
+    console.warn(`[지역신문 자동 갱신] ${label}: NAVER_CLIENT_ID/SECRET이 비어 있어 건너뜁니다.`);
+    return;
+  }
+
+  let added = 0;
+  let failed = 0;
+  for (const sido of Object.keys(LOCAL_NEWSPAPER_DOMAINS)) {
+    try {
+      /* forceRefresh=false면 시/도별 24시간 TTL이 그대로 적용된다. 기동
+         직후 따라잡기가 재시작마다 33번씩 네이버를 긁지 않도록 하는 게
+         이 구분의 목적이다. */
+      const result = await fetchLocalNews(sido, forceRefresh);
+      if (result.status === "error") {
+        failed++;
+        console.warn(`[지역신문 자동 갱신] ${sido}: ${result.error}`);
+      } else {
+        added += result.addedCount || 0;
+      }
+    } catch (err) {
+      failed++;
+      console.error(`[지역신문 자동 갱신] ${sido} 실패:`, err.message);
+    }
+  }
+
+  console.log(
+    `[지역신문 자동 갱신] ${label}: 기사 ${added}건 추가` +
+      (failed > 0 ? `, ${failed}개 지역 실패` : "") +
+      ` (${new Date().toLocaleString("ko-KR")})`
+  );
+}
+
+/* 최신기사 -> 지역신문 순서로 이어서 돌린다. 둘을 한 스케줄에 묶어둔
+   것은 관리 지점을 하나로 두기 위해서다. */
+async function runScheduledRefresh(label, forceRefresh) {
+  await runScheduledNewsRefresh(label, forceRefresh);
+  await runScheduledLocalNewsRefresh(label, forceRefresh);
+}
+
 function startNewsScheduler() {
   if (!NEWS_CRON_ENABLED) {
     console.log("- 최신기사 자동 갱신이 꺼져 있습니다 (NEWS_CRON_ENABLED=0).");
@@ -874,7 +917,7 @@ function startNewsScheduler() {
     /* 정기 실행은 forceRefresh=true다. 어제 낮에 방문자가 있었으면 24시간
        TTL이 아직 안 지나 그냥 넘어가 버리는데, 그러면 "매일 한 번"이
        지켜지지 않는다. */
-    const task = cron.schedule(NEWS_CRON_SCHEDULE, () => runScheduledNewsRefresh("정기 실행", true), {
+    const task = cron.schedule(NEWS_CRON_SCHEDULE, () => runScheduledRefresh("정기 실행", true), {
       name: "latest-news-refresh",
       timezone: NEWS_CRON_TIMEZONE,
       noOverlap: true,
@@ -893,7 +936,7 @@ function startNewsScheduler() {
      깨어나는 환경에서는 예약 시각에 프로세스가 아예 없었을 수 있다.
      여기서는 forceRefresh=false라 24시간 TTL이 그대로 적용되고, 재시작이
      잦아도 API 호출이 늘지 않는다. */
-  runScheduledNewsRefresh("기동 직후 따라잡기", false);
+  runScheduledRefresh("기동 직후 따라잡기", false);
 }
 
 /* ---------------- 6) 지역 이슈 자동 발견 ---------------- */
@@ -1289,52 +1332,193 @@ function linkMatchesDomain(link, domain) {
   }
 }
 
-/* 시/도 하나를 다시 조회하는 빈도가 잦을 수 있어(지역 현황 화면을
-   새로고침할 때마다) 짧게 메모리 캐시한다 - "최신기사"처럼 영구
-   아카이브가 필요한 기능은 아니라서 서버 재시작 시 사라져도 무방하다. */
-const LOCAL_NEWS_CACHE_TTL_MS = 15 * 60 * 1000; // 15분
+/* 지역신문 기사는 Supabase의 news_local_articles에 누적한다
+   (supabase/news_local_archive.sql). 최신기사 아카이브와 같은 이유다:
+   네이버 뉴스 검색은 최신순이라 지나간 날짜를 소급해 받을 수 없어서,
+   저장해 두지 않으면 그날 기사는 영영 사라진다.
+
+   예전에는 저장소가 프로세스 메모리 Map 하나에 TTL 15분이었다. 서버가
+   재시작하면 통째로 날아가므로, 자주 잠들었다 깨는 환경에서는 방문자가
+   지역을 고를 때마다 네이버 호출이 새로 나갔다. 이제 하루 한 번 스케줄러가
+   갱신하고 화면은 DB에서 읽으므로, TTL도 최신기사와 같은 24시간으로 맞춘다.
+
+   Supabase 키가 없을 때만 기존처럼 메모리 Map으로 동작한다(로컬 개발용). */
+const LOCAL_NEWS_CACHE_TTL_MS = NEWS_CACHE_TTL_MS; // 24시간
 const localNewsCache = new Map(); // 캐시 키(시/도) -> { items, fetchedAt }
+
+/* 화면이 한 시/도에 보여주는 기사 수. 누적된 과거 기사 중 최신순 상위
+   이만큼만 읽어온다. */
+const LOCAL_NEWS_DISPLAY_LIMIT = 30;
+
+function localNewsRowToItem(row) {
+  return {
+    title: row.title,
+    summary: row.summary || "",
+    url: row.url,
+    outlet: row.outlet,
+    orientation: row.orientation || "",
+    date: row.article_date,
+  };
+}
+
+async function loadLocalNewsFromDb(sido) {
+  const { data, error } = await supabaseAdmin
+    .from("news_local_articles")
+    .select("title, summary, url, outlet, orientation, article_date")
+    .eq("sido", sido)
+    .order("article_date", { ascending: false })
+    .order("added_at", { ascending: false })
+    .limit(LOCAL_NEWS_DISPLAY_LIMIT);
+  if (error) throw new Error(`news_local_articles 조회 실패: ${error.message}`);
+
+  const { data: state, error: stateError } = await supabaseAdmin
+    .from("news_local_fetch_state")
+    .select("last_fetched_at")
+    .eq("sido", sido)
+    .maybeSingle();
+  if (stateError) throw new Error(`news_local_fetch_state 조회 실패: ${stateError.message}`);
+
+  return {
+    items: data.map(localNewsRowToItem),
+    lastFetchedAt: state?.last_fetched_at || null,
+  };
+}
+
+async function saveLocalNewsToDb(sido, items, lastFetchedAt) {
+  let inserted = 0;
+
+  if (items.length > 0) {
+    const rows = items.map((it) => ({
+      sido,
+      url: it.url,
+      outlet: it.outlet,
+      title: it.title,
+      summary: it.summary || "",
+      orientation: it.orientation || null,
+      article_date: it.date,
+    }));
+    /* 이미 담긴 기사는 조용히 건너뛴다. (sido, url) unique 제약이
+       중복 저장을 DB에서 직접 막는다. select()를 붙이면 실제로 들어간
+       행만 돌아오므로, 그 개수가 곧 새로 쌓인 기사 수다. */
+    const { data, error } = await supabaseAdmin
+      .from("news_local_articles")
+      .upsert(rows, { onConflict: "sido,url", ignoreDuplicates: true })
+      .select("id");
+    if (error) throw new Error(`news_local_articles 저장 실패: ${error.message}`);
+    inserted = data ? data.length : 0;
+  }
+
+  const { error } = await supabaseAdmin
+    .from("news_local_fetch_state")
+    .upsert({ sido, last_fetched_at: lastFetchedAt });
+  if (error) throw new Error(`news_local_fetch_state 저장 실패: ${error.message}`);
+
+  return inserted;
+}
+
+function loadLocalNewsStore(sido) {
+  if (!supabaseAdmin) {
+    const cached = localNewsCache.get(sido);
+    return Promise.resolve({
+      items: cached?.items || [],
+      lastFetchedAt: cached ? new Date(cached.fetchedAt).toISOString() : null,
+    });
+  }
+  return loadLocalNewsFromDb(sido);
+}
+
+/* 새로 저장된 기사 수를 돌려준다(이미 담겨 있던 건 제외). */
+async function saveLocalNewsStore(sido, fetchedItems, lastFetchedAt) {
+  if (!supabaseAdmin) {
+    /* 메모리 폴백에는 누적 개념이 없다. 방금 받아온 것만 들고 있는다. */
+    const before = localNewsCache.get(sido)?.items.length || 0;
+    const items = fetchedItems.slice(0, LOCAL_NEWS_DISPLAY_LIMIT);
+    localNewsCache.set(sido, { items, fetchedAt: Date.now() });
+    return Math.max(0, items.length - before);
+  }
+  return saveLocalNewsToDb(sido, fetchedItems, lastFetchedAt);
+}
+
+/* 네이버 호출을 연달아 쏟아내면 HTTP 429가 돌아온다. 전체 갱신은 신문사
+   33곳을 훑으므로 사이에 짧은 간격을 둔다. */
+const LOCAL_NEWS_FETCH_DELAY_MS = Math.max(0, parseInt(process.env.LOCAL_NEWS_FETCH_DELAY_MS, 10) || 400);
+
+function sleep(ms) {
+  return ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
+}
 
 /* 시/도별로 등록된 지역신문 이름을 그대로 네이버 뉴스 검색어로 써서
    기사를 모은 뒤, 실제로 그 신문사 도메인에서 나온 기사만 남긴다(검색어
    매칭만으로는 그 신문사를 인용/언급한 다른 매체 기사도 섞이기 때문에
    도메인 확인이 필수). 여러 신문사 결과를 합쳐 최신순으로 정렬한다. */
-async function fetchLocalNews(sido) {
+async function fetchLocalNewsFromNaver(papers) {
+  const seenUrls = new Set();
+  const fetched = [];
+  for (const paper of papers) {
+    try {
+      const results = await fetchNaverNews(paper.name, 1);
+      results
+        .filter((it) => linkMatchesDomain(it.url, paper.domain))
+        .forEach((it) => {
+          if (seenUrls.has(it.url)) return;
+          seenUrls.add(it.url);
+          fetched.push({ ...it, outlet: paper.name });
+        });
+    } catch (err) {
+      console.error(`지역신문(${paper.name}) 조회 실패:`, err.message);
+    }
+    await sleep(LOCAL_NEWS_FETCH_DELAY_MS);
+  }
+  fetched.sort((a, b) => b.date.localeCompare(a.date));
+  return fetched;
+}
+
+async function fetchLocalNews(sido, forceRefresh = false) {
   const papers = LOCAL_NEWSPAPER_DOMAINS[sido] || [];
   const outlets = papers.map((p) => p.name);
 
   if (papers.length === 0) {
     return { status: "not_configured", outlets, items: [], topKeywords: [] };
   }
-  if (!NAVER_CLIENT_ID || !NAVER_CLIENT_SECRET) {
-    return { status: "not_configured", outlets, items: [], topKeywords: [] };
+
+  let store;
+  try {
+    store = await loadLocalNewsStore(sido);
+  } catch (err) {
+    return { status: "error", outlets, items: [], topKeywords: [], error: err.message };
   }
 
-  const cached = localNewsCache.get(sido);
-  let items;
+  const isFresh =
+    store.lastFetchedAt && Date.now() - new Date(store.lastFetchedAt).getTime() < LOCAL_NEWS_CACHE_TTL_MS;
 
-  if (cached && Date.now() - cached.fetchedAt < LOCAL_NEWS_CACHE_TTL_MS) {
-    items = cached.items;
-  } else {
-    const seenUrls = new Set();
-    const fetched = [];
-    for (const paper of papers) {
+  let items = store.items;
+  let addedCount = 0;
+
+  if (!isFresh || forceRefresh) {
+    if (!NAVER_CLIENT_ID || !NAVER_CLIENT_SECRET) {
+      /* 키가 없어도 이미 쌓아둔 기사는 그대로 보여준다. */
+      if (items.length === 0) {
+        return { status: "not_configured", outlets, items: [], topKeywords: [] };
+      }
+    } else {
       try {
-        const results = await fetchNaverNews(paper.name, 1);
-        results
-          .filter((it) => linkMatchesDomain(it.url, paper.domain))
-          .forEach((it) => {
-            if (seenUrls.has(it.url)) return;
-            seenUrls.add(it.url);
-            fetched.push({ ...it, outlet: paper.name });
-          });
+        const fetched = await fetchLocalNewsFromNaver(papers);
+        /* 화면에 보이는 건 최신순 30건뿐이지만 저장은 받아온 전부를 한다.
+           그래서 새로 쌓인 수는 화면 개수 차이가 아니라 저장소가 알려주는
+           실제 삽입 행 수로 센다. */
+        addedCount = await saveLocalNewsStore(sido, fetched, new Date().toISOString());
+        /* 저장 후 다시 읽어 누적본 기준 최신순 상위를 가져온다. 방금 받은
+           것만 쓰면 이전에 쌓인 기사가 화면에서 빠진다. */
+        const reloaded = await loadLocalNewsStore(sido);
+        items = reloaded.items;
       } catch (err) {
-        console.error(`지역신문(${paper.name}) 조회 실패:`, err.message);
+        // 새로 못 가져왔어도 쌓아둔 기사는 그대로 보여준다.
+        if (items.length === 0) {
+          return { status: "error", outlets, items: [], topKeywords: [], error: err.message };
+        }
+        console.error(`지역신문(${sido}) 갱신 실패:`, err.message);
       }
     }
-    fetched.sort((a, b) => b.date.localeCompare(a.date));
-    items = fetched.slice(0, 30);
-    localNewsCache.set(sido, { items, fetchedAt: Date.now() });
   }
 
   /* "주요 지역 이슈" 카드용 - 지역신문 기사 제목에서 자주 등장하는
@@ -1353,7 +1537,7 @@ async function fetchLocalNews(sido) {
     topKeywords = candidates.filter((kw) => !outlets.some((name) => name.includes(kw) || kw.includes(name))).slice(0, 3);
   }
 
-  return { status: "ok", outlets, items, topKeywords };
+  return { status: "ok", outlets, items, topKeywords, addedCount };
 }
 
 /* ---------------- 라우트 ---------------- */
@@ -1410,6 +1594,65 @@ async function handleNewsRefresh(req, res) {
 
 app.get("/api/latest-news/refresh", handleNewsRefresh);
 app.post("/api/latest-news/refresh", handleNewsRefresh);
+
+/* 지역신문만 갱신한다. ?sido=서울특별시 처럼 한 지역만 지정할 수 있고,
+   생략하면 17개 시/도를 전부 훑는다(네이버 호출 33번). */
+async function handleLocalNewsRefresh(req, res) {
+  if (!checkNewsRefreshAuth(req, res)) return;
+
+  const sido = req.query.sido || "";
+  try {
+    if (sido) {
+      if (!LOCAL_NEWSPAPER_DOMAINS[sido]) {
+        return res.status(400).json({ status: "error", error: `등록되지 않은 시/도입니다: ${sido}` });
+      }
+      const result = await fetchLocalNews(sido, true);
+      return res.json({
+        status: result.status,
+        sido,
+        added: result.addedCount || 0,
+        total: result.items.length,
+        error: result.error || null,
+      });
+    }
+
+    await runScheduledLocalNewsRefresh("수동 요청", true);
+    res.json({ status: "ok", regions: Object.keys(LOCAL_NEWSPAPER_DOMAINS).length });
+  } catch (err) {
+    console.error("지역신문 즉시 갱신 실패:", err);
+    res.status(502).json({ status: "error", error: err.message });
+  }
+}
+
+app.get("/api/local-news/refresh", handleLocalNewsRefresh);
+app.post("/api/local-news/refresh", handleLocalNewsRefresh);
+
+/* 최신기사 + 지역신문을 한 번에. 외부 cron이 서버를 깨우면서 둘 다
+   갱신시키려면 이 경로 하나만 호출하면 된다. */
+async function handleAllNewsRefresh(req, res) {
+  if (!checkNewsRefreshAuth(req, res)) return;
+
+  try {
+    const latest = await refreshNewsArchive(true);
+    await runScheduledLocalNewsRefresh("수동 요청", true);
+    res.json({
+      status: "ok",
+      latestNews: {
+        status: latest.status,
+        added: latest.addedCount,
+        total: latest.archive.length,
+        error: latest.error,
+      },
+      localNews: { regions: Object.keys(LOCAL_NEWSPAPER_DOMAINS).length },
+    });
+  } catch (err) {
+    console.error("전체 즉시 갱신 실패:", err);
+    res.status(502).json({ status: "error", error: err.message });
+  }
+}
+
+app.get("/api/news/refresh", handleAllNewsRefresh);
+app.post("/api/news/refresh", handleAllNewsRefresh);
 
 app.get("/api/latest-news", async (req, res) => {
   try {
