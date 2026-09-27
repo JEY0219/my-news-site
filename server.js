@@ -42,6 +42,7 @@ require("dotenv").config();
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
+const cron = require("node-cron");
 const { createClient } = require("@supabase/supabase-js");
 
 const app = express();
@@ -518,9 +519,9 @@ function pairArticles(items) {
   return groups;
 }
 
-/* 하루에 새로 쌓는 페어 수. 과거 기사는 절대 지우지 않고 이 아카이브
-   파일에 계속 누적된다. 짝을 못 찾은 단일 기사는 화면에 보여줄 게
-   아니므로 아카이브에도 저장하지 않는다. */
+/* 하루에 새로 쌓는 페어 수. 과거 기사는 절대 지우지 않고 아카이브에
+   계속 누적된다. 짝을 못 찾은 단일 기사는 화면에 보여줄 게 아니므로
+   아카이브에도 저장하지 않는다. */
 const TARGET_PAIR_COUNT = 5;
 
 /* 주제 하나당 Naver 뉴스 검색을 몇 페이지까지 더 가져갈지의 상한.
@@ -529,6 +530,31 @@ const TARGET_PAIR_COUNT = 5;
    대통령실) 한두 페이지에서 끝난다 — 이 상한은 그마저도 부족한 날의
    안전장치일 뿐이다. */
 const MAX_PAGES_PER_TOPIC = 5;
+
+/* ---- 아카이브 저장소 ----
+
+   SUPABASE_SERVICE_ROLE_KEY가 설정돼 있으면 Supabase의 news_pairs /
+   news_fetch_state 테이블에 쌓고(supabase/news_archive.sql), 없으면
+   예전처럼 data/news-cache.json 파일에 쌓는다.
+
+   DB를 기본으로 삼는 이유는 파일이 영구적이지 않아서다. 그 파일은
+   .gitignore에 있어 커밋되지 않고, Render 무료 플랜처럼 디스크가
+   휘발성인 환경에서는 재배포나 잠자기 후 재시작마다 사라진다. 네이버
+   뉴스 검색은 최신순이라 지나간 날짜를 소급해 받을 수 없어서, 한 번
+   날아간 과거 기사는 복구되지 않는다.
+
+   파일 경로를 남겨둔 것은 Supabase 키 없이 `npm start`만으로 돌려보는
+   로컬 개발을 위해서다. */
+
+/* 같은 페어가 두 번 저장되는 것을 막는 키. 두 기사 URL을 정렬해
+   이어붙이므로 좌/우 순서가 바뀌어도 같은 값이 나온다. DB에서는 이
+   컬럼의 unique 제약이 중복 저장을 직접 막아준다. */
+function newsGroupUrlKey(group) {
+  return group.articles
+    .map((a) => a.url)
+    .sort()
+    .join("\n");
+}
 
 function readNewsArchive() {
   try {
@@ -550,6 +576,80 @@ function writeNewsArchive(store) {
   } catch (e) {
     console.error("뉴스 아카이브 저장 실패:", e.message);
   }
+}
+
+/* PostgREST는 한 번에 최대 1000행만 내려준다. 아카이브는 계속 자라므로
+   range()로 끝까지 훑지 않으면 오래된 기사가 조용히 잘려 나간다. */
+const NEWS_DB_PAGE_SIZE = 1000;
+
+function newsRowToGroup(row) {
+  const group = {
+    type: row.group_type,
+    articles: row.articles,
+    addedAt: row.added_at,
+  };
+  if (row.score !== null && row.score !== undefined) group.score = Number(row.score);
+  return group;
+}
+
+async function loadNewsArchiveFromDb() {
+  const archive = [];
+  for (let from = 0; ; from += NEWS_DB_PAGE_SIZE) {
+    const { data, error } = await supabaseAdmin
+      .from("news_pairs")
+      .select("group_type, group_date, score, articles, added_at")
+      .order("group_date", { ascending: false })
+      .order("added_at", { ascending: false })
+      .range(from, from + NEWS_DB_PAGE_SIZE - 1);
+    if (error) throw new Error(`news_pairs 조회 실패: ${error.message}`);
+    archive.push(...data.map(newsRowToGroup));
+    if (data.length < NEWS_DB_PAGE_SIZE) break;
+  }
+
+  const { data: state, error: stateError } = await supabaseAdmin
+    .from("news_fetch_state")
+    .select("last_fetched_at")
+    .eq("id", "latest-news")
+    .maybeSingle();
+  if (stateError) throw new Error(`news_fetch_state 조회 실패: ${stateError.message}`);
+
+  return { archive, lastFetchedAt: state?.last_fetched_at || null };
+}
+
+async function saveNewsGroupsToDb(newGroups, lastFetchedAt) {
+  if (newGroups.length > 0) {
+    const rows = newGroups.map((group) => ({
+      url_key: newsGroupUrlKey(group),
+      group_type: group.type,
+      group_date: group.articles[0]?.date || null,
+      score: typeof group.score === "number" ? group.score : null,
+      articles: group.articles,
+      added_at: group.addedAt,
+    }));
+    /* ignoreDuplicates: 이미 담긴 페어는 조용히 건너뛴다. 스케줄러와
+       방문자 요청이 겹쳐 같은 페어를 동시에 넣으려 해도 실패하지 않는다. */
+    const { error } = await supabaseAdmin
+      .from("news_pairs")
+      .upsert(rows, { onConflict: "url_key", ignoreDuplicates: true });
+    if (error) throw new Error(`news_pairs 저장 실패: ${error.message}`);
+  }
+
+  const { error } = await supabaseAdmin
+    .from("news_fetch_state")
+    .upsert({ id: "latest-news", last_fetched_at: lastFetchedAt });
+  if (error) throw new Error(`news_fetch_state 저장 실패: ${error.message}`);
+}
+
+function loadNewsStore() {
+  return supabaseAdmin ? loadNewsArchiveFromDb() : Promise.resolve(readNewsArchive());
+}
+
+async function saveNewsArchive(newGroups, mergedArchive, lastFetchedAt) {
+  if (!supabaseAdmin) {
+    writeNewsArchive({ archive: mergedArchive, lastFetchedAt });
+    return;
+  }
+  await saveNewsGroupsToDb(newGroups, lastFetchedAt);
 }
 
 function collectExistingUrls(archive) {
@@ -609,12 +709,25 @@ async function fetchDailyGroups(existingUrls) {
    오늘자 신규 그룹만 가져와 아카이브 앞에 이어붙인다. 기존 항목은
    절대 삭제하거나 덮어쓰지 않는다. */
 async function getLatestNewsArchive(forceRefresh) {
-  const store = readNewsArchive();
+  let store;
+  try {
+    store = await loadNewsStore();
+  } catch (err) {
+    // 저장소를 아예 못 읽으면 보여줄 것도 없다.
+    return { status: "error", archive: [], lastFetchedAt: null, addedCount: 0, error: err.message };
+  }
+
   const isFresh =
     store.lastFetchedAt && Date.now() - new Date(store.lastFetchedAt).getTime() < NEWS_CACHE_TTL_MS;
 
   if (isFresh && !forceRefresh) {
-    return { status: "ok", archive: store.archive, lastFetchedAt: store.lastFetchedAt, error: null };
+    return {
+      status: "ok",
+      archive: store.archive,
+      lastFetchedAt: store.lastFetchedAt,
+      addedCount: 0,
+      error: null,
+    };
   }
 
   if (!NAVER_CLIENT_ID || !NAVER_CLIENT_SECRET) {
@@ -622,6 +735,7 @@ async function getLatestNewsArchive(forceRefresh) {
       status: store.archive.length > 0 ? "ok" : "not_configured",
       archive: store.archive,
       lastFetchedAt: store.lastFetchedAt,
+      addedCount: 0,
       error: null,
     };
   }
@@ -631,17 +745,105 @@ async function getLatestNewsArchive(forceRefresh) {
     const newGroups = await fetchDailyGroups(existingUrls);
     const mergedArchive = [...newGroups, ...store.archive];
     const lastFetchedAt = new Date().toISOString();
-    writeNewsArchive({ archive: mergedArchive, lastFetchedAt });
-    return { status: "ok", archive: mergedArchive, lastFetchedAt, error: null };
+    await saveNewsArchive(newGroups, mergedArchive, lastFetchedAt);
+    return {
+      status: "ok",
+      archive: mergedArchive,
+      lastFetchedAt,
+      addedCount: newGroups.length,
+      error: null,
+    };
   } catch (err) {
     // 새로 못 가져왔어도 기존에 쌓아둔 아카이브는 그대로 보여준다.
     return {
       status: store.archive.length > 0 ? "ok" : "error",
       archive: store.archive,
       lastFetchedAt: store.lastFetchedAt,
+      addedCount: 0,
       error: err.message,
     };
   }
+}
+
+/* ---------------- 5-1) 최신기사 자동 갱신 스케줄러 ---------------- */
+
+/* 지금까지 아카이브는 "누군가 /api/latest-news를 열었고, 마지막 갱신에서
+   24시간이 지났을 때"만 자랐다. 방문자가 없는 날은 통째로 비고, 그날
+   올라온 기사는 네이버 최신순(sort=date) 검색 결과에서 밀려나 영영 담지
+   못한다. 그래서 서버가 떠 있는 동안에는 매일 정해진 시각에 스스로 한 번
+   갱신한다.
+
+   "페이지 열 때 갱신"은 그대로 둔다. 둘 다 같은 getLatestNewsArchive()를
+   쓰고 이미 담긴 URL은 collectExistingUrls()로 걸러지므로, 겹쳐 돌아도
+   같은 기사가 중복 저장되지 않는다. */
+const NEWS_CRON_SCHEDULE = process.env.NEWS_CRON_SCHEDULE || "0 6 * * *";
+const NEWS_CRON_TIMEZONE = process.env.NEWS_CRON_TIMEZONE || "Asia/Seoul";
+const NEWS_CRON_ENABLED = process.env.NEWS_CRON_ENABLED !== "0";
+
+/* 스케줄러와 방문자 요청이 동시에 네이버를 긁고 같은 파일에 쓰는 것을
+   막는 잠금. 이미 갱신이 돌고 있으면 그 결과를 그대로 나눠 쓴다. */
+let newsRefreshInFlight = null;
+
+function refreshNewsArchive(forceRefresh) {
+  if (newsRefreshInFlight) return newsRefreshInFlight;
+  newsRefreshInFlight = getLatestNewsArchive(forceRefresh).finally(() => {
+    newsRefreshInFlight = null;
+  });
+  return newsRefreshInFlight;
+}
+
+async function runScheduledNewsRefresh(label, forceRefresh) {
+  if (!NAVER_CLIENT_ID || !NAVER_CLIENT_SECRET) {
+    console.warn(`[뉴스 자동 갱신] ${label}: NAVER_CLIENT_ID/SECRET이 비어 있어 건너뜁니다.`);
+    return;
+  }
+  try {
+    const result = await refreshNewsArchive(forceRefresh);
+    if (result.error) {
+      console.warn(`[뉴스 자동 갱신] ${label}: ${result.error}`);
+    }
+    console.log(
+      `[뉴스 자동 갱신] ${label}: 그룹 ${result.addedCount}개 추가 (총 ${result.archive.length}개, ${new Date().toLocaleString("ko-KR")})`
+    );
+  } catch (err) {
+    console.error(`[뉴스 자동 갱신] ${label} 실패:`, err.message);
+  }
+}
+
+function startNewsScheduler() {
+  if (!NEWS_CRON_ENABLED) {
+    console.log("- 최신기사 자동 갱신이 꺼져 있습니다 (NEWS_CRON_ENABLED=0).");
+    return;
+  }
+  if (!cron.validate(NEWS_CRON_SCHEDULE)) {
+    console.error(`- NEWS_CRON_SCHEDULE("${NEWS_CRON_SCHEDULE}")이 올바른 cron 식이 아니라 자동 갱신을 건너뜁니다.`);
+    return;
+  }
+
+  try {
+    /* 정기 실행은 forceRefresh=true다. 어제 낮에 방문자가 있었으면 24시간
+       TTL이 아직 안 지나 그냥 넘어가 버리는데, 그러면 "매일 한 번"이
+       지켜지지 않는다. */
+    const task = cron.schedule(NEWS_CRON_SCHEDULE, () => runScheduledNewsRefresh("정기 실행", true), {
+      name: "latest-news-refresh",
+      timezone: NEWS_CRON_TIMEZONE,
+      noOverlap: true,
+    });
+    const nextRun = task.getNextRun();
+    console.log(
+      `- 최신기사 자동 갱신 예약됨: "${NEWS_CRON_SCHEDULE}" (${NEWS_CRON_TIMEZONE})` +
+        (nextRun ? `, 다음 실행 ${nextRun.toLocaleString("ko-KR")}` : "")
+    );
+  } catch (err) {
+    console.error("- 최신기사 자동 갱신 예약 실패:", err.message);
+    return;
+  }
+
+  /* 기동 직후 한 번 더 따라잡는다. Render 무료 플랜처럼 서버가 잠들었다
+     깨어나는 환경에서는 예약 시각에 프로세스가 아예 없었을 수 있다.
+     여기서는 forceRefresh=false라 24시간 TTL이 그대로 적용되고, 재시작이
+     잦아도 API 호출이 늘지 않는다. */
+  runScheduledNewsRefresh("기동 직후 따라잡기", false);
 }
 
 /* ---------------- 6) 지역 이슈 자동 발견 ---------------- */
@@ -1141,7 +1343,7 @@ app.get("/api/latest-news", async (req, res) => {
     const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
 
-    const result = await getLatestNewsArchive(forceRefresh);
+    const result = await refreshNewsArchive(forceRefresh);
     const sorted = sortGroupsByDateDesc(result.archive);
     /* 전국 이슈 3개(issue_discovery.sql/admin.js)에 쓰던 것과 같은
        classifyArticleNpf()를 그대로 재사용해 기사마다 NPF(피해자/책임
@@ -1257,4 +1459,5 @@ app.listen(PORT, () => {
   if (!POPULATION_API_URL) console.warn("- POPULATION_API_URL이 비어 있습니다. 데이터포털 활용신청 페이지의 요청 URL을 붙여넣어야 합니다.");
   if (!NAVER_CLIENT_ID || !NAVER_CLIENT_SECRET) console.warn("- NAVER_CLIENT_ID/SECRET이 비어 있습니다. .env를 확인하세요.");
   if (!supabaseAdmin) console.warn("- SUPABASE_SERVICE_ROLE_KEY가 비어 있습니다. 지역 이슈 자동 발견 기능을 쓰려면 .env에 설정하세요.");
+  startNewsScheduler();
 });
